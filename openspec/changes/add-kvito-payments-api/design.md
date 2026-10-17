@@ -2,7 +2,7 @@
 
 ## Context
 
-Greenfield repo — there is no existing code. We are building a small FastAPI service that lets an online school accept course payments through Kvito. See `proposal.md` for motivation. Hard constraints that shape the approach: money is integer kopecks everywhere (no floats), payment creation must be idempotent, the status lifecycle is a strict 3-transition machine, and the bank webhook must be signature-verified. The service runs on PostgreSQL (SQLAlchemy + Alembic), is containerized, and is linted/tested in CI.
+Greenfield repo — there is no existing code. We are building a small FastAPI service that lets an online school accept course payments through Kvitto. See `proposal.md` for motivation. Hard constraints that shape the approach: money is integer kopecks everywhere (no floats), payment creation must be idempotent, the status lifecycle is a strict 3-transition machine, and the bank webhook must be signature-verified. The service runs on PostgreSQL (SQLAlchemy + Alembic), is containerized, and is linted/tested in CI.
 
 ## Goals / Non-Goals
 
@@ -15,7 +15,7 @@ Greenfield repo — there is no existing code. We are building a small FastAPI s
 - Pure, unit-testable money/status logic separated from I/O.
 
 **Non-Goals:**
-- Real Kvito/bank integration (no real external API calls; the bank is modeled by the webhook).
+- Real Kvitto/bank integration (no real external API calls; the bank is modeled by the webhook).
 - End-user authentication or authorization.
 - Frontend, deployment/scaling, and payment date scheduling (only amounts, no dates).
 
@@ -26,15 +26,19 @@ All amounts are `int` in Pydantic schemas, service logic, and DB columns (`Integ
 - **Why:** Kopecks are whole units; integer arithmetic is exact. `price * PCT // 100` is exact for integer prices.
 - **Alternative considered:** `Decimal` — rejected; adds no precision benefit for integer kopecks and invites confusion.
 
-### 2. Three tables; methods and statuses are enums
-`tariffs(id, title, price)`, `promo_codes(code, discount_pct)`, `payments(...)`. `method` (`card`/`sbp`/`installment`) and `status` (`pending`/`succeeded`/`failed`/`refunded`) are Python `enum.Enum` stored as short strings. `schedule` is a JSON list of ints or `NULL`. `idempotency_key` is a `UNIQUE`, nullable column.
-- **Why:** `method`/`status` are fixed closed sets — enums keep queries simple and the DB self-documenting. A separate `payment_methods` table (as initially floated) is YAGNI.
-- **Alternative considered:** lookup tables for methods — rejected (no expected growth, extra joins for nothing).
+### 2. Three tables; explicit primary keys; methods and statuses are enums
+- `tariffs(id, title, price)`: `id` is a **unique integer primary key**; `title` is unique.
+- `promo_codes(code, discount_pct)`: **no `id`** — `code` is the **unique primary key**.
+- `payments(id, tariff_id, email, method, installment_months, amount, discount, schedule, status, idempotency_key, created_at)`: `id` is a **unique UUID primary key** (referenced by the bank webhook, so non-enumerable); `idempotency_key` is a **UUID, `UNIQUE`, `NOT NULL`**.
 
-### 3. Idempotency via a unique key + find-or-create
-`payments.idempotency_key` is `UNIQUE`. On `POST /payments` with the header: `SELECT` by key → if found, return it with `200`; otherwise `INSERT` with `201`. Under concurrency the `UNIQUE` constraint lets exactly one insert win; the loser catches `IntegrityError`, re-fetches, and returns the existing row. No duplicate is possible. A request without the header inserts with a `NULL` key (Postgres allows multiple `NULL`s in a unique index).
-- **Why:** One column on `payments` is the simplest correct model; the key is also the conceptual "stable idempotency key at the bank", so a retry after a network timeout reuses it and cannot double-charge.
-- **Alternative considered:** a separate `idempotency_keys` table — rejected; the mapping to a payment is 1:1, so the column is simpler.
+`method` (`card`/`sbp`/`installment`) and `status` (`pending`/`succeeded`/`failed`/`refunded`) are Python `enum.Enum` stored as short strings. `schedule` is a JSON list of ints or `NULL`.
+- **Why:** `method`/`status` are fixed closed sets — enums keep queries simple and the DB self-documenting. `payments.id` is a UUID because the bank references it; `tariffs`/`promo_codes` are tiny internal catalogs, so an integer `id` (tariffs) and the natural `code` (promo_codes) are simplest.
+- **Alternative considered:** lookup tables for methods — rejected (no expected growth, extra joins for nothing); a separate `id` on `promo_codes` — rejected (the `code` is already a natural unique key).
+
+### 3. Idempotency via a unique, always-present UUID key + find-or-create
+`payments.idempotency_key` is a **UUID, `UNIQUE`, `NOT NULL`** — every payment has one. On `POST /payments`: if the `Idempotency-Key` header is present it must be a **valid UUID** (otherwise `422`); if it is absent the server **generates a UUID**. Then `SELECT` by key → if found, return it with `200`; otherwise `INSERT` with `201`. Under concurrency the `UNIQUE` constraint lets exactly one insert win; the loser catches `IntegrityError`, re-fetches, and returns the existing row. No duplicate is possible.
+- **Why:** One column on `payments` is the simplest correct model; the key is also the conceptual "stable idempotency key at the bank", so a retry after a network timeout reuses it and cannot double-charge. Making it `NOT NULL` means every payment is idempotency-addressable even when the client supplies no key.
+- **Alternative considered:** a nullable key (header-less requests stored `NULL`) — rejected per the `NOT NULL` requirement; a separate `idempotency_keys` table — rejected; the mapping to a payment is 1:1, so the column is simpler.
 
 ### 4. Short DB transaction; the "bank call" happens after commit
 The pending payment is inserted and committed in its own short transaction. A real bank call would be made **after** commit, using the idempotency key — never while a transaction is open. With no real bank, the webhook is the external actor that advances status, and the commit-then-act ordering is what makes a timeout-retry safe.

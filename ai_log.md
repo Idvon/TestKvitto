@@ -84,3 +84,54 @@
 **Проверки:** `openspec status` → 4/4 артефакта; `openspec validate` и `openspec validate --strict` → валидно.
 
 **Осталось:** реализовать по `/opsx-apply` (кода пока нет). Коммиты/пуш/merge в main — пользователем вручную.
+
+---
+
+## 2026-10-17 — Редактирование: ключи таблиц (по решению пользователя)
+
+Уточнили схему ключей в `design.md` (решения 2 и 3), `tasks.md` (2.1) и `specs/payments/spec.md`:
+- `tariffs`: `id` — уникальный **целочисленный** PK.
+- `promo_codes`: `id` не нужен, `code` — уникальный PK.
+- `payments`: `id` — уникальный **UUID** PK; `idempotency_key` — **UUID, UNIQUE, NOT NULL**.
+
+Последствие NOT NULL: у каждого платежа всегда есть UUID-ключ. Без заголовка `Idempotency-Key` сервер генерирует UUID; если заголовок передан — он обязан быть валидным UUID (иначе 422). Добавлен сценарий в спеке: невалидный `Idempotency-Key` → 422. Клиенту ключ не возвращается, поэтому наблюдаемого поведения API это не меняет.
+
+**Проверка:** `openspec validate --strict` → валидно.
+
+---
+
+## 2026-10-17 — Редактирование: опечатка бренда kvito → kvitto
+
+Заменил во всех артефактах изменения `Kvito` (один t) на `Kvitto` (два t) — 4 вхождения в `proposal.md`, `design.md` (2), `specs/payments/spec.md`. Теперь единообразно с доменом `kвитto.pro` и промокодом `KVITTO10`.
+
+Примечание: имя самого изменения-слаг `add-kvito-payments-api` не менял (это идентификатор, не текст; переименование изменения — отдельная операция). `openspec validate --strict` → валидно.
+
+---
+
+## 2026-10-17 — Реализация по `/opsx-apply` (все 21 задача)
+
+Реализовал сервис полностью. Все 21 задача в `tasks.md` отмечены `[x]`.
+
+**Создано:**
+- `app/` — `main.py` (фабрика `create_app`, lifespan: `create_all` + seed), `db.py` (engine/SessionLocal/Base/`get_db`), `models.py` (Tariff, PromoCode, Payment; enum'ы через `SAEnum(native_enum=False, values_callable=...)` → хранят канонические нижние значения `card`/`pending`), `schemas.py`, `money.py` (`apply_discount`, `build_schedule`), `status.py` (`PaymentStatus`, `ALLOWED`), `seed.py` (идемпотентный upsert), `services/payments.py` (`create_payment` find-or-create с обработкой `IntegrityError`, `apply_webhook_status`), `routers/{tariffs,payments,webhooks}.py`.
+- `alembic.ini`, `alembic/env.py` (URL из env `DATABASE_URL`), `alembic/versions/..._initial_schema.py` (автогенерация: 3 таблицы, enum'ы lowercase, `idempotency_key` UUID UNIQUE NOT NULL).
+- `tests/` — `conftest.py` (SQLite in-memory StaticPool, override `get_db`, seed, `TestClient` без контекстного менеджера → lifespan не гоняется), `test_money.py`, `test_status.py`, `test_api.py` (тарифы, создание, промокод вкл. нижний регистр, график 3/6/12, идемпотентность, 404, фильтры, подпись вебхука, переходы, 409).
+- `requirements.txt`, `ruff.toml` (`extend-exclude=["alembic/versions"]` — генерируемые миграции не линтим), `.env.example`, `Dockerfile` (python:3.13-slim, entrypoint `alembic upgrade head && uvicorn`), `docker-compose.yml` (postgres:16 + api, env-инъект `DATABASE_URL`/`WEBHOOK_SECRET`), `.github/workflows/ci.yml` (push/PR: ruff, pytest, docker build), `README.md` (запуск/тесты/curl).
+
+**Ключевые технические решения при реализации:**
+- `psycopg[binary]` (не голый `psycopg`) — иначе на Windows падает загрузка pq-обёртки.
+- `values_callable` в `SAEnum` — чтобы в БД хранились `card`/`pending` (значения), а не `CARD`/`PENDING` (имена), как в спеке.
+- `sqlalchemy.Uuid` (портативный) и `SAEnum(native_enum=False)` — чтобы схема работала и на SQLite (тесты), и на Postgres (прод).
+- `TestClient(app)` без `with` — иначе lifespan попытается поднять Postgres по модульному engine.
+- Ruff: `extend-immutable-calls` для `fastapi.Depends/Query/...` (B008), `alembic/versions` исключён (генерируется Alembic).
+
+**Проверки:**
+- `ruff check .` → All checks passed.
+- `pytest` → **31 passed** (7 unit: money/status; 24 integration: API + вебхук).
+- `alembic upgrade head` (SQLite) → 3 таблицы + alembic_version.
+- Бут-проверка: `uvicorn app.main:app` на SQLite → `GET /tariffs` вернул basic/standard/premium с ценами 990000/1990000/2990000.
+- YAML `ci.yml` и `docker-compose.yml` валидны.
+
+**Ограничение окружения:** Docker в этой среде не установлен → `docker compose up --build` не запускался; вместо этого бут-путь (migrate + uvicorn + `/tariffs`) проверен локально на SQLite. Файлы Docker/compose/CI написаны и структурно верны, но не прогонялись в контейнере.
+
+**Осталось:** пользователь вручную — коммит/пуш/merge; при наличии Docker — прогнать `docker compose up --build`; затем архивировать изменение (`/opsx-archive`) и синк-спеков в main.

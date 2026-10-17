@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how the online school accepts and tracks course payments through Kvito, with exact integer-kopeck arithmetic, idempotent payment creation, and a strict payment-status lifecycle driven by bank webhooks.
+Defines how the online school accepts and tracks course payments through Kvitto, with exact integer-kopeck arithmetic, idempotent payment creation, and a strict payment-status lifecycle driven by bank webhooks.
 
 ## ADDED Requirements
 
@@ -82,6 +82,10 @@ When `POST /payments` includes an `Idempotency-Key` header, the system SHALL use
 #### Scenario: Distinct keys create distinct payments
 - **WHEN** a client posts `POST /payments` twice with different `Idempotency-Key` values
 - **THEN** two separate payments are created
+
+#### Scenario: Malformed idempotency key rejected
+- **WHEN** a client posts `POST /payments` with an `Idempotency-Key` header that is not a valid UUID
+- **THEN** the response is `422` and no payment is created
 
 ### Requirement: New payment starts pending
 A newly created payment SHALL have status `pending`.

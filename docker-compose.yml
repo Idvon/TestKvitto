@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kvitto
+      POSTGRES_PASSWORD: kvitto
+      POSTGRES_DB: kvitto
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kvitto"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://kvitto:kvitto@db:5432/kvitto}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-in-prod}
+    ports:
+      - "8000:8000"

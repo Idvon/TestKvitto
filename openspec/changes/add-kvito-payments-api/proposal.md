@@ -2,7 +2,7 @@
 
 ## Why
 
-The online school needs a small service to accept course payments through Kvito. The codebase is tiny, but money handling demands precision — kopecks without loss, idempotent retries, and correct status transitions — so the service must be exact by design, not by convention.
+The online school needs a small service to accept course payments through Kvitto. The codebase is tiny, but money handling demands precision — kopecks without loss, idempotent retries, and correct status transitions — so the service must be exact by design, not by convention.
 
 ## What Changes
 
