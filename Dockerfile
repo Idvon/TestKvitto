@@ -4,6 +4,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+LABEL org.opencontainers.image.source="https://github.com/Idvon/TestKvitto"
+
 WORKDIR /app
 
 COPY requirements.txt .
