@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 import uuid
 
 from fastapi import APIRouter, Depends, Request
@@ -13,20 +12,18 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.services.payments import TransitionResult, apply_webhook_status
+from app.settings import get_settings
 from app.status import PaymentStatus
 
 router = APIRouter()
-
-
-def _webhook_secret() -> bytes:
-    return os.getenv("WEBHOOK_SECRET", "").encode()
 
 
 def verify_signature(body: bytes, signature: str | None) -> bool:
     """Constant-time check of ``X-Signature`` = HMAC-SHA256(raw body, secret)."""
     if signature is None:
         return False
-    expected = hmac.new(_webhook_secret(), body, hashlib.sha256).hexdigest()
+    secret = get_settings().webhook_secret.encode()
+    expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 

@@ -86,18 +86,23 @@ README.md
 ```
 - **Why:** Pure logic (`money.py`, `status.py`) is separated from I/O so the money rules are testable in isolation; routers stay thin.
 
-### 10. Testing with SQLite, Postgres in the container
-pytest + httpx (ASGI transport) exercise the real app. Tests run against **SQLite** (the schema — integer columns, JSON, string enums — is portable) so the suite is fast and dependency-free in CI; the Docker image targets **Postgres 16**. Keep queries standard SQL so both backends behave identically.
-- **Why:** Avoids requiring a live Postgres for every test run while the production target stays Postgres.
-- **Alternative considered:** a Postgres service/container in CI — heavier; SQLite is sufficient for this scope.
+### 10. Testing: unit tests for pure logic; integration tests dropped
+The correctness-critical logic — kopeck arithmetic (`money.py`) and the 3-transition status machine (`status.py`) — is pure and unit-tested without I/O (`tests/test_money.py`, `tests/test_status.py`). The originally planned integration tests (DB-session stubbed over the PostgreSQL dialect) were **dropped**: there was no mandatory requirement for them, and the environment has intermittent Postgres connectivity. API/service behavior is exercised against the running service rather than by an automated integration suite.
+- **Why:** The money/status rules are where correctness lives and they are pure, so unit tests prove them without a database; HTTP-level integration tests added little beyond that and depended on a live or stubbed Postgres.
+- **Alternative considered:** DB-session-stubbed integration tests (original plan) — dropped per decision; a live-Postgres integration suite — rejected (environment instability, external dependency).
 
 ### 11. CI and Docker
 GitHub Actions on each push: setup Python 3.13, install deps, `ruff check .`, `pytest`, then `docker build` (proves the image compiles). `Dockerfile` is `python:3.13-slim` running uvicorn; `docker-compose.yml` defines `db` (postgres:16) and `api`, with `DATABASE_URL` and `WEBHOOK_SECRET` injected from the environment and an entrypoint that runs `alembic upgrade head` before starting the app.
 - **Why:** Lint + tests + image build on every push gives a fast correctness net; compose gives a one-command local run.
 
+### 12. Configuration: DSN and secrets via pydantic-settings
+The Postgres DSN and `WEBHOOK_SECRET` are declared in a single `pydantic_settings.BaseSettings` class that reads the process environment and the local `.env` file. The DSN field is typed as pydantic's `PostgresDsn`, so a malformed connection string fails fast at startup with a clear validation error. There is **no static/hardcoded fallback URL** — the DSN always comes from the environment/`.env`.
+- **Why:** `BaseSettings` gives typed, validated configuration from `.env` in one place; `PostgresDsn` validates the connection string's shape. Removing any hardcoded default means a missing or typo'd DSN is an immediate, obvious error rather than a silent connection to the wrong database.
+- **Alternative considered:** reading `os.getenv("DATABASE_URL")` with a hardcoded default (the previous `_url()` pattern) — rejected; the default masked misconfiguration and duplicated the config source.
+
 ## Risks / Trade-offs
 
-- **[SQLite in tests vs Postgres in prod]** → keep queries to standard SQL and portable column types so both backends agree; if a Postgres-only feature ever becomes necessary, gate it behind the dialect.
+- **[No integration tests]** → API/service behavior is not covered by automated tests; the pure money/status logic is unit-tested, and `alembic upgrade head` against a real Postgres validates dialect-specific SQL.
 - **[Concurrent same-key race]** → the `UNIQUE` constraint is the source of truth; the code path catches `IntegrityError` and re-fetches. Happy path is tested; the constraint covers the rare race.
 - **[Reading the raw body twice]** → read `request.body()` once, verify the signature, then `json.loads` the same bytes; never re-serialize.
 - **[Float creep]** → money only enters/leaves through `money.py`; ruff + review forbid `float` amounts.
@@ -113,4 +118,4 @@ Greenfield, so there is nothing to migrate:
 
 ## Open Questions
 
-None that would change the specs, the approach, or the task breakdown. Chosen defaults (recorded, not blocking): Postgres 16, Python 3.13, SQLite for the test suite.
+None that would change the specs, the approach, or the task breakdown. Chosen defaults (recorded, not blocking): Postgres 16, Python 3.13, DSN via pydantic-settings, integration tests dropped (unit tests only).

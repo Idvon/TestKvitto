@@ -8,7 +8,7 @@ The online school needs a small service to accept course payments through Kvitto
 
 - New FastAPI service exposing a payments API for an online school: tariff catalog, payment creation, payment queries, and a bank webhook.
 - Money is handled exclusively as **integer kopecks** (no floats) across the API and the database.
-- Tariff catalog seeded at startup: `basic` (990000), `standard` (1990000), `premium` (2990000) kopecks.
+- Tariff catalog seeded at startup: `basic` (9 900 ₽ = 990000 kopecks), `standard` (19 900 ₽ = 1990000 kopecks), `premium` (29 900 ₽ = 2990000 kopecks).
 - Promo code `KVITTO10` (case-insensitive) applies −10% of the tariff price; unknown codes are rejected with `422`.
 - Payment methods `card` / `sbp` / `installment`; `installment` requires `installment_months` ∈ {3, 6, 12} and produces a kopeck-exact schedule whose parts sum exactly to the amount (remainder placed in the first payments).
 - **Idempotent** payment creation via the `Idempotency-Key` header: a repeat with the same key returns the existing payment (`200`) and never creates a second.
@@ -29,5 +29,5 @@ The online school needs a small service to accept course payments through Kvitto
 
 - **New service** — the repo is greenfield, so no existing code is affected.
 - **New API surface**: `GET /tariffs`, `POST /payments`, `GET /payments/{id}`, `GET /payments`, `POST /webhooks/bank`.
-- **New dependencies**: FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, PostgreSQL, pytest, httpx, ruff; Docker + docker-compose; a GitHub Actions workflow.
+- **New dependencies**: FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.0, Alembic, PostgreSQL, psycopg, pytest, httpx, ruff; Docker + docker-compose; a GitHub Actions workflow.
 - **Security**: `WEBHOOK_SECRET` and DB credentials are supplied via environment variables; no secrets are committed; `.env.example` documents placeholders. Access to data and keys is limited to the app process and the compose network.

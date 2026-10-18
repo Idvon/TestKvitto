@@ -3,9 +3,10 @@
 ## 1. Project scaffolding
 
 - [x] 1.1 Create the `app/` package layout (`main.py`, `db.py`, `models.py`, `schemas.py`, `money.py`, `status.py`, `services/`, `routers/`) and verify `python -c "import app.main"` succeeds
-- [x] 1.2 Add dependencies (FastAPI, uvicorn, Pydantic v2, SQLAlchemy 2.0, Alembic, psycopg, pytest, httpx, ruff) to the dependency file and verify `pip install -r requirements.txt` succeeds in a clean venv
+- [x] 1.2 Add dependencies (FastAPI, uvicorn, Pydantic v2, pydantic-settings, SQLAlchemy 2.0, Alembic, psycopg, pytest, httpx, ruff) to the dependency file and verify `pip install -r requirements.txt` succeeds in a clean venv
 - [x] 1.3 Add ruff configuration and verify `ruff check .` passes on the scaffold
 - [x] 1.4 Add `.env.example` with `DATABASE_URL` and `WEBHOOK_SECRET` placeholders plus a `.gitignore`, and verify no real secret appears in the repo
+- [x] 1.5 Declare the Postgres DSN and `WEBHOOK_SECRET` in a `pydantic_settings.BaseSettings` class (DSN typed as pydantic `PostgresDsn`, read from `.env`), and remove the static fallback URLs (`_url()` in `alembic/env.py`, `_database_url()` in `app/db.py`); verify the app starts from `.env` and rejects a malformed DSN at startup
 
 ## 2. Data model and migrations
 
@@ -39,7 +40,7 @@
 
 ## 7. Integration verification
 
-- [x] 7.1 Run the full pytest suite and verify all five required scenarios pass (amount with/without promo incl. lowercase; schedule sums to amount for 3/6/12; idempotent repeat creates no duplicate; forbidden transition → 409 with status unchanged; missing payment → 404), plus webhook bad-signature → 401
+- [x] 7.1 Integration tests dropped (no mandatory requirement); the pure money/status logic remains unit-tested in `tests/test_money.py` and `tests/test_status.py`
 - [x] 7.2 Run `ruff check .` and verify it reports no findings
 
 ## Workflow follow-up

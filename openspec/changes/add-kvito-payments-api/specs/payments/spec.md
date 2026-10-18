@@ -7,18 +7,18 @@ Defines how the online school accepts and tracks course payments through Kvitto,
 ## ADDED Requirements
 
 ### Requirement: Tariff catalog
-The system SHALL expose the list of course tariffs, each with an `id`, a `title`, and a `price` expressed in integer kopecks. The catalog SHALL be seeded at startup with `basic` (990000), `standard` (1990000), and `premium` (2990000).
+The system SHALL expose the list of course tariffs, each with an `id`, a `title`, and a `price` expressed in integer kopecks. The catalog SHALL be seeded at startup with `basic` (9 900 ₽ = 990000 kopecks), `standard` (19 900 ₽ = 1990000 kopecks), and `premium` (29 900 ₽ = 2990000 kopecks).
 
 #### Scenario: List tariffs
 - **WHEN** a client sends `GET /tariffs`
 - **THEN** the response is `200` and the body is a list of `{id, title, price}` for `basic`, `standard`, and `premium` with prices `990000`, `1990000`, and `2990000` respectively
 
 ### Requirement: Money as integer kopecks
-All monetary amounts in API requests, API responses, and storage SHALL be represented as integers in kopecks. The system SHALL NOT use floating-point values for money.
+All monetary amounts in API requests, API responses, and storage SHALL be represented as integers in kopecks (1 ₽ = 100 kopecks). The system SHALL NOT use floating-point values for money.
 
 #### Scenario: Amounts are integer kopecks
 - **WHEN** a payment for `standard` without a promo code is created
-- **THEN** its `amount` is the integer `1990000` and no fractional currency unit appears anywhere in the response
+- **THEN** its `amount` is the integer `1990000` (19 900 ₽) and no fractional currency unit appears anywhere in the response
 
 ### Requirement: Payment creation
 The system SHALL create a payment when a valid request is posted to `POST /payments` with a body containing `tariff_id`, `email`, and `method`, returning `201` and the created payment. `promo_code` is optional and `installment_months` is required only for the `installment` method.
