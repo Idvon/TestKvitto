@@ -177,3 +177,15 @@
 **Проверки:** `pytest` → 7 passed (только юнит); `ruff check .` → clean.
 
 **Осталось:** коммит/пуш/merge вручную; при желании — архивировать изменение (`/opsx-archive`) и синк спеков в main.
+
+---
+
+## 2026-10-18 — Мелкие правки: postgres:17 и GET /payments/{id}
+
+По запросу пользователя:
+- `docker-compose.yml`: `postgres:16` → `postgres:17` (соответствие локальному Postgres 17); для консистентности обновлены упоминания в `design.md` и `tasks.md`.
+- Маршрут `GET /payments/{payment_id}` → `GET /payments/{id}` (`app/routers/payments.py`); заголовок раздела и curl в `README.md` приведены к `{id}`. Поле `payment_id` в теле вебхука не менялось — это имя поля payload, а не параметр маршрута.
+
+**Проверки:** `ruff check .` → clean; пути из OpenAPI: `/payments`, `/payments/{id}`, `/tariffs`, `/webhooks/bank`.
+
+**Решение по `alembic upgrade head`:** запускать «однократно» не нужно — команда идемпотентна (если БД уже на head, это no-op). Текущий пэттерн (запуск при каждом старте контейнера api) безопасен и стандартен для контейнерных приложений.

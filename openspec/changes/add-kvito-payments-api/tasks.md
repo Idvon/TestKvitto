@@ -34,7 +34,7 @@
 
 ## 6. Containerization and CI
 
-- [x] 6.1 Add a `Dockerfile` (python:3.13-slim, uvicorn) and `docker-compose.yml` (postgres:16 `db` + `api`, env-injected `DATABASE_URL`/`WEBHOOK_SECRET`, entrypoint runs `alembic upgrade head`) and verify `docker compose up --build` boots and `GET /tariffs` responds
+- [x] 6.1 Add a `Dockerfile` (python:3.13-slim, uvicorn) and `docker-compose.yml` (postgres:17 `db` + `api`, env-injected `DATABASE_URL`/`WEBHOOK_SECRET`, entrypoint runs `alembic upgrade head`) and verify `docker compose up --build` boots and `GET /tariffs` responds
 - [x] 6.2 Add a GitHub Actions workflow on push (setup Python 3.13, `ruff check .`, `pytest`, `docker build`) and verify the workflow is valid YAML and its steps match the local commands
 - [x] 6.3 Write the README (how to run, how to test, curl examples) and verify each documented command runs as written
 

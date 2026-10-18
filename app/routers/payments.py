@@ -28,9 +28,9 @@ def create_payment_endpoint(
     return payment
 
 
-@router.get("/payments/{payment_id}", response_model=PaymentOut)
-def get_payment(payment_id: uuid.UUID, db: Session = Depends(get_db)):
-    payment = db.get(Payment, payment_id)
+@router.get("/payments/{id}", response_model=PaymentOut)
+def get_payment(id: uuid.UUID, db: Session = Depends(get_db)):
+    payment = db.get(Payment, id)
     if payment is None:
         raise HTTPException(status_code=404, detail="payment not found")
     return payment

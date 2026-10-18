@@ -145,12 +145,12 @@ curl -X POST http://127.0.0.1:8000/payments \
   -d '{"tariff_id":2,"email":"me@example.com","method":"card"}'
 ```
 
-### `GET /payments/{payment_id}`
+### `GET /payments/{id}`
 
 Returns one payment, or `404` if it does not exist.
 
 ```bash
-curl http://127.0.0.1:8000/payments/<payment_id>
+curl http://127.0.0.1:8000/payments/<id>
 ```
 
 ### `GET /payments`

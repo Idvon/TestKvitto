@@ -92,7 +92,7 @@ The correctness-critical logic — kopeck arithmetic (`money.py`) and the 3-tran
 - **Alternative considered:** DB-session-stubbed integration tests (original plan) — dropped per decision; a live-Postgres integration suite — rejected (environment instability, external dependency).
 
 ### 11. CI and Docker
-GitHub Actions on each push: setup Python 3.13, install deps, `ruff check .`, `pytest`, then `docker build` (proves the image compiles). `Dockerfile` is `python:3.13-slim` running uvicorn; `docker-compose.yml` defines `db` (postgres:16) and `api`, with `DATABASE_URL` and `WEBHOOK_SECRET` injected from the environment and an entrypoint that runs `alembic upgrade head` before starting the app.
+GitHub Actions on each push: setup Python 3.13, install deps, `ruff check .`, `pytest`, then `docker build` (proves the image compiles). `Dockerfile` is `python:3.13-slim` running uvicorn; `docker-compose.yml` defines `db` (postgres:17) and `api`, with `DATABASE_URL` and `WEBHOOK_SECRET` injected from the environment and an entrypoint that runs `alembic upgrade head` before starting the app.
 - **Why:** Lint + tests + image build on every push gives a fast correctness net; compose gives a one-command local run.
 
 ### 12. Configuration: DSN and secrets via pydantic-settings
