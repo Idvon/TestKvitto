@@ -7,5 +7,5 @@ SQLAlchemy
 alembic
 psycopg[binary]
 pytest
-httpx
+httpx2
 ruff

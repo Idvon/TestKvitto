@@ -86,10 +86,10 @@ README.md
 ```
 - **Why:** Pure logic (`money.py`, `status.py`) is separated from I/O so the money rules are testable in isolation; routers stay thin.
 
-### 10. Testing: unit tests for pure logic; integration tests dropped
-The correctness-critical logic — kopeck arithmetic (`money.py`) and the 3-transition status machine (`status.py`) — is pure and unit-tested without I/O (`tests/test_money.py`, `tests/test_status.py`). The originally planned integration tests (DB-session stubbed over the PostgreSQL dialect) were **dropped**: there was no mandatory requirement for them, and the environment has intermittent Postgres connectivity. API/service behavior is exercised against the running service rather than by an automated integration suite.
-- **Why:** The money/status rules are where correctness lives and they are pure, so unit tests prove them without a database; HTTP-level integration tests added little beyond that and depended on a live or stubbed Postgres.
-- **Alternative considered:** DB-session-stubbed integration tests (original plan) — dropped per decision; a live-Postgres integration suite — rejected (environment instability, external dependency).
+### 10. Testing: unit tests for pure logic + integration tests on a separate Postgres test DB
+The pure money/status logic (`money.py`, `status.py`) is unit-tested without I/O (`tests/test_money.py`, `tests/test_status.py`). Integration tests (`tests/test_api.py`) exercise the real app + real SQL against a **dedicated test database** (separate from the main DB). The test schema is created by **`alembic upgrade head`** on the test DB (not `create_all`). Each test runs inside a transaction that is **rolled back** afterwards (savepoint-based, so the app's own `commit()` does not leak), giving isolation without dropping tables or the database. The setup never touches the main database and never cleans/drops the schema without an explicit check; if the test database cannot be created (permissions), it is surfaced for manual creation.
+- **Why:** A separate DB + per-test rollback gives real SQL coverage (money math, idempotency, status machine, webhook) with full isolation and no dependence on main data; Alembic keeps the test schema in lockstep with production migrations.
+- **Alternative considered:** DB-session stub (original plan) — dropped (less real); running tests against the main DB — rejected (data safety); SQLite — rejected (dialect fidelity).
 
 ### 11. CI and Docker
 GitHub Actions on each push: setup Python 3.13, install deps, `ruff check .`, `pytest`, then `docker build` (proves the image compiles). `Dockerfile` is `python:3.13-slim` running uvicorn; `docker-compose.yml` defines `db` (postgres:17) and `api`, with `DATABASE_URL` and `WEBHOOK_SECRET` injected from the environment and an entrypoint that runs `alembic upgrade head` before starting the app.
@@ -102,7 +102,7 @@ The Postgres DSN and `WEBHOOK_SECRET` are declared in a single `pydantic_setting
 
 ## Risks / Trade-offs
 
-- **[No integration tests]** → API/service behavior is not covered by automated tests; the pure money/status logic is unit-tested, and `alembic upgrade head` against a real Postgres validates dialect-specific SQL.
+- **[Integration tests need a test DB]** → a dedicated test database is required; it is created/migrated by the test setup (Alembic) and isolated by per-test rollback. The main DB is never used or cleaned; if the test DB cannot be auto-created, it is created manually.
 - **[Concurrent same-key race]** → the `UNIQUE` constraint is the source of truth; the code path catches `IntegrityError` and re-fetches. Happy path is tested; the constraint covers the rare race.
 - **[Reading the raw body twice]** → read `request.body()` once, verify the signature, then `json.loads` the same bytes; never re-serialize.
 - **[Float creep]** → money only enters/leaves through `money.py`; ruff + review forbid `float` amounts.
@@ -118,4 +118,4 @@ Greenfield, so there is nothing to migrate:
 
 ## Open Questions
 
-None that would change the specs, the approach, or the task breakdown. Chosen defaults (recorded, not blocking): Postgres 16, Python 3.13, DSN via pydantic-settings, integration tests dropped (unit tests only).
+None that would change the specs, the approach, or the task breakdown. Chosen defaults (recorded, not blocking): Postgres 17, Python 3.13, DSN via pydantic-settings, integration tests on a separate Postgres test DB with per-test transaction rollback.

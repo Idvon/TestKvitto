@@ -40,7 +40,7 @@
 
 ## 7. Integration verification
 
-- [x] 7.1 Integration tests dropped (no mandatory requirement); the pure money/status logic remains unit-tested in `tests/test_money.py` and `tests/test_status.py`
+- [x] 7.1 Restore integration tests on a dedicated Postgres test DB: `tests/conftest.py` creates an engine for the test DB, applies `alembic upgrade head`, and isolates each test by rolling back a transaction (savepoint-based) — never using or cleaning the main database, and surfacing for manual creation if the test DB cannot be created; `tests/test_api.py` covers the required scenarios (amount with/without promo incl. lowercase; schedule sums to amount for 3/6/12; new key → 201, repeat key → 200 no duplicate; forbidden transition → 409 unchanged; missing payment → 404; webhook bad-signature → 401)
 - [x] 7.2 Run `ruff check .` and verify it reports no findings
 
 ## Workflow follow-up

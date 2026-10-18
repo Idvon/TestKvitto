@@ -9,8 +9,8 @@ All money is handled as **integer kopecks** — no floats, no rounding surprises
 ## Tech stack
 
 - Python 3.13, FastAPI, Pydantic v2
-- SQLAlchemy 2.0 + Alembic (migrations), PostgreSQL 16 (psycopg v3)
-- pytest + httpx (tests run on in-memory SQLite)
+- SQLAlchemy 2.0 + Alembic (migrations), PostgreSQL 17 (psycopg v3)
+- pytest + httpx2 (integration tests run against a dedicated Postgres test DB)
 - ruff (lint/format)
 - Docker + docker-compose, GitHub Actions (CI)
 
@@ -78,7 +78,7 @@ Interactive docs: http://127.0.0.1:8000/docs
 docker compose up --build
 ```
 
-This starts `postgres:16` and the API. The API entrypoint runs
+This starts `postgres:17` and the API. The API entrypoint runs
 `alembic upgrade head` before booting uvicorn. Override `DATABASE_URL` and
 `WEBHOOK_SECRET` by exporting them before `docker compose up`.
 
@@ -88,9 +88,12 @@ This starts `postgres:16` and the API. The API entrypoint runs
 pytest
 ```
 
-Tests run against an in-memory SQLite database (no PostgreSQL required) and
-cover the money math, the status machine, payment creation, idempotency,
-querying, and the webhook (signature + transitions).
+Unit tests (`test_money.py`, `test_status.py`) are pure and need no database.
+Integration tests (`test_api.py`) run against a dedicated Postgres test
+database (`<main>_test`), which the test setup creates and migrates
+automatically; each test is isolated by a rolled-back transaction. They cover
+payment creation, idempotency, querying, and the webhook (signature +
+transitions).
 
 ## Lint
 
